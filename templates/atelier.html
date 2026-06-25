@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Vitesse du vent — Marseille</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+    }
+    h1 { color: #1a1a2e; margin-bottom: 0.2rem; }
+    p.subtitle { color: #555; margin-bottom: 2rem; }
+    .gauge-container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      padding: 2rem;
+      width: 380px;
+      text-align: center;
+    }
+    .current-value {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #0077b6;
+      margin-top: 0.5rem;
+    }
+    .label { color: #888; font-size: 0.9rem; }
+    select {
+      margin: 1.5rem 0 1rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+    #error { color: red; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>🌬️ Vitesse du vent — Marseille</h1>
+  <p class="subtitle">Données horaires du jour — Open-Meteo</p>
+
+  <div class="gauge-container">
+    <label for="heureSelect" class="label">Choisir une heure :</label><br>
+    <select id="heureSelect"></select>
+    <canvas id="gaugeChart" width="340" height="200"></canvas>
+    <div class="current-value" id="valeurAffichee">— km/h</div>
+    <div class="label">Vitesse du vent à 10m d'altitude</div>
+  </div>
+
+  <p id="error"></p>
+
+  <script>
+    let chart = null;
+
+    // Construit une jauge demi-cercle avec Chart.js (doughnut coupé)
+    function buildGauge(speed) {
+      const max = 100;
+      const val = Math.min(speed, max);
+      const reste = max - val;
+
+      // Couleur selon intensité
+      let color = "#00b4d8";
+      if (val > 60) color = "#e63946";
+      else if (val > 35) color = "#f4a261";
+
+      const ctx = document.getElementById("gaugeChart").getContext("2d");
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          datasets: [{
+            data: [val, reste, max],      // valeur | vide | moitié cachée
+            backgroundColor: [color, "#e0e0e0", "transparent"],
+            borderWidth: 0,
+            circumference: 180,
+            rotation: 270
+          }]
+        },
+        options: {
+          responsive: false,
+          cutout: "75%",
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: false }
+          }
+        }
+      });
+    }
+
+    async function chargerDonnees() {
+      try {
+        const resp = await fetch("/atelier-data");
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+
+        const select = document.getElementById("heureSelect");
+        data.forEach((item, i) => {
+          const heure = item.datetime.split("T")[1];
+          const opt = document.createElement("option");
+          opt.value = i;
+          opt.textContent = heure;
+          select.appendChild(opt);
+        });
+
+        // Heure actuelle par défaut
+        const now = new Date().getHours();
+        select.selectedIndex = Math.min(now, data.length - 1);
+
+        function afficher() {
+          const idx = parseInt(select.value);
+          const speed = data[idx].wind_speed_kmh;
+          document.getElementById("valeurAffichee").textContent = speed + " km/h";
+          buildGauge(speed);
+        }
+
+        select.addEventListener("change", afficher);
+        afficher();
+
+      } catch (e) {
+        document.getElementById("error").textContent = "Erreur : " + e.message;
+      }
+    }
+
+    chargerDonnees();
+  </script>
+</body>
+</html>
