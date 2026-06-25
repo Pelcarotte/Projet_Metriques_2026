@@ -27,6 +27,10 @@ def api_paris():
         for i in range(n)
     ]
 
+@app.route("/rapport")
+def mongraphique():
+    return render_template("graphique.html")
+    
     return jsonify(result)
 
 if __name__ == "__main__":
